@@ -4,8 +4,6 @@ End-to-end data engineering pipeline tracking US energy production, consumption,
 
 ## Architecture
 
-## Architecture
-
 ```mermaid
 graph LR
     subgraph Data Source
@@ -32,9 +30,7 @@ graph LR
     end
 
     EIA --> Py
-    ```
 
-    
 ## Tech Stack
 
 | Layer | Technology |
