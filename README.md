@@ -32,6 +32,7 @@ graph LR
     end
 
     EIA --> Py
+    ```
     
 ## Tech Stack
 
