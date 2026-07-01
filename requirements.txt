@@ -1,0 +1,6 @@
+requests
+python-dotenv
+kafka-python
+deltalake
+pyarrow
+google-generativeai

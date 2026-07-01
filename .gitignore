@@ -1,0 +1,27 @@
+# environment
+.env
+venv/
+
+# data files (too large for git)
+data/
+
+# snowflake keys (sensitive)
+snowflake_rsa_key.p8
+snowflake_rsa_key.pub
+
+# dbt
+energy_dbt/target/
+energy_dbt/dbt_packages/
+energy_dbt/logs/
+
+# python
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+
+# logs
+logs/
+
+# generated keys
+generate_keys.py

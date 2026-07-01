@@ -1,0 +1,13 @@
+version: 2
+
+sources:
+  - name: silver
+    database: ENERGY_PIPELINE
+    schema: SILVER
+    tables:
+      - name: energy_silver
+  - name: scd
+    database: ENERGY_PIPELINE
+    schema: GOLD
+    tables:
+      - name: state_energy_mix_scd
