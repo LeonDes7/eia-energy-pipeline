@@ -4,8 +4,35 @@ End-to-end data engineering pipeline tracking US energy production, consumption,
 
 ## Architecture
 
-*(Architecture diagram placeholder)*
+## Architecture
 
+```mermaid
+graph LR
+    subgraph Data Source
+        EIA[EIA Open Data API]
+    end
+
+    subgraph Ingestion & Streaming
+        Py[Python Ingestion Script] --> Kafka[(Apache Kafka <br> KRaft mode)]
+    end
+
+    subgraph Storage & Enrichment
+        Kafka --> Delta[(Delta Lake <br> Bronze Layer)]
+        Delta --> Groq[Groq LLM <br> Llama3 Enrichment]
+        Groq --> Delta2[(Delta Lake <br> Silver Layer)]
+    end
+
+    subgraph Data Warehouse & Modeling
+        Delta2 --> Snowflake[(Snowflake <br> XSMALL)]
+        Snowflake --> dbt[dbt Core <br> Models & SCD Type 2]
+    end
+
+    subgraph Presentation
+        dbt --> Metabase[Metabase Dashboard]
+    end
+
+    EIA --> Py
+    
 ## Tech Stack
 
 | Layer | Technology |
