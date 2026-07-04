@@ -1,6 +1,8 @@
 # EIA Energy Pipeline
 
-End-to-end data engineering pipeline tracking US energy production, consumption, and pricing across electricity, natural gas, and renewables by region (2020-2024).
+![dbt CI](https://github.com/LeonDes7/eia-energy-pipeline/actions/workflows/validate.yml/badge.svg)
+
+End-to-end data engineering pipeline tracking US energy production, consumption, and pricing across electricity, natural gas, and renewables by region (2015-2024).
 
 ## Architecture
 
@@ -39,48 +41,53 @@ graph LR
 | Ingestion | Python, EIA Open Data API |
 | Streaming | Apache Kafka (KRaft mode) |
 | Lake Storage | Delta Lake (partitioned by source + period) |
-| LLM Enrichment | Groq (Llama3) – trend narrative generation |
+| LLM Enrichment | Groq (Llama3) -- trend narrative generation |
 | Warehouse | Snowflake (XSMALL, auto-suspend) |
 | Data Modeling | dbt Core + dbt-snowflake |
 | Data Quality | Great Expectations 1.18 |
 | Orchestration | Docker Compose |
 | Dashboard | Metabase |
+| CI/CD | GitHub Actions (dbt tests on every push) |
 
 ## Pipeline Layers
 
 ### Bronze (Raw)
 - Raw EIA data landed as-is from the API
-- 6,293 records across electricity generation, natural gas prices, and renewable generation
+- 110,834 unique records across electricity generation, natural gas prices, and renewable generation
 - Partitioned by `source` and `period`
-- Great Expectations enforces 6 schema contracts on ingestion – intentionally catches 3 negative value anomalies in raw EIA feed
+- Great Expectations enforces 6 schema contracts on ingestion -- intentionally catches 3 negative value anomalies in raw EIA feed
 
 ### Silver (Cleaned + Enriched)
-- 87 records dropped (nulls, negatives)
-- 6,206 clean records
+- 3,403 records dropped (nulls, negatives)
+- 114,237 clean records
 - Fuel type and state code normalization (`COL` → `Coal`, `CA` → `California`)
 - LLM enrichment: Groq generates plain-English trend summaries for sampled records
-- Great Expectations enforces 5 contracts – all pass, confirming cleaning logic works
+- Great Expectations enforces 5 contracts -- all pass, confirming cleaning logic works
 
 ### Gold (Snowflake + dbt)
-Four dbt mart models:
-- `renewable_share_by_state` – % renewable vs fossil by state and period
-- `price_volatility_index` – rolling stddev of natural gas prices by region
-- `demand_vs_generation_gap` – total vs renewable generation by state
-- `state_energy_mix_history` – exposes SCD Type 2 dimension table
+Four dbt mart models validated by 11 automated data tests:
+- `renewable_share_by_state` -- % renewable vs fossil by state and period
+- `price_volatility_index` -- rolling stddev of natural gas prices by region
+- `demand_vs_generation_gap` -- total vs renewable generation by state
+- `state_energy_mix_history` -- exposes SCD Type 2 dimension table
 
 ## Snowflake Features Used
-- **Key-pair authentication** – RSA-based auth for programmatic access
-- **SCD Type 2** – `MERGE` statement tracks state energy mix changes over time with `valid_from`, `valid_to`, `is_current`, and `row_hash` fingerprinting
-- **Streams + Tasks** – Snowflake Stream watches `energy_silver` for new data, Task runs SCD merge automatically on hourly CRON schedule
-- **RBAC** – read-only `energy_analyst_readonly` role scoped to gold schema only
-- **Resource Monitor** – 20-credit cap with 75% notification threshold
+- **Key-pair authentication** -- RSA-based auth for programmatic access
+- **SCD Type 2** -- `MERGE` statement tracks state energy mix changes over time with `valid_from`, `valid_to`, `is_current`, and `row_hash` fingerprinting
+- **Streams + Tasks** -- Snowflake Stream watches `energy_silver` for new data, Task runs SCD merge automatically on hourly CRON schedule
+- **RBAC** -- read-only `energy_analyst_readonly` role scoped to gold schema only
+- **Resource Monitor** -- 20-credit cap with 75% notification threshold
 
 ## Data Quality
 
 | Layer | Expectations | Result |
 |---|---|---|
-| Bronze | 6 | 5/6 pass – 3 negative values caught (raw EIA anomalies, expected) |
-| Silver | 5 | 5/5 pass – confirms cleaning logic removes all anomalies |
+| Bronze | 6 | 5/6 pass -- 3 negative values caught (raw EIA anomalies, expected) |
+| Silver | 5 | 5/5 pass -- confirms cleaning logic removes all anomalies |
+| dbt Gold | 11 | 11/11 pass -- all gold mart columns validated |
+
+## CI/CD
+GitHub Actions runs `dbt test` against Snowflake automatically on every push to master, ensuring gold layer integrity across all commits.
 
 ## Dashboard
 Metabase connected to Snowflake gold layer via key-pair auth.
@@ -89,13 +96,13 @@ Metabase connected to Snowflake gold layer via key-pair auth.
 
 ## Screenshots
 
-### dbt Run
+### dbt Run + Tests (11/11 passing)
 ![dbt run](screenshots/dbt_run.png)
 
-### Bronze Validation (intentional fail)
+### Bronze Validation (intentional fail -- catches raw anomalies)
 ![Bronze GE](screenshots/bronze_ge.png)
 
-### Silver Validation (all pass)
+### Silver Validation (all pass -- anomalies remediated)
 ![Silver GE](screenshots/silver_ge.png)
 
 ### Snowflake SCD Table
@@ -114,39 +121,39 @@ Metabase connected to Snowflake gold layer via key-pair auth.
 
 ```bash
 # 1. Clone and setup
-git clone [https://github.com/LeonDes7/eia-energy-pipeline](https://github.com/LeonDes7/eia-energy-pipeline)
+git clone https://github.com/LeonDes7/eia-energy-pipeline
 cd eia-energy-pipeline
 python -m venv venv
-source venv/bin/activate  # On Windows use: venv\Scripts\activate
+venv\Scripts\activate  # On Mac/Linux: source venv/bin/activate
 pip install -r requirements.txt
 
 # 2. Configure environment
 cp .env.example .env
 # Fill in EIA_API_KEY, GROQ_API_KEY, SNOWFLAKE_ACCOUNT, SNOWFLAKE_USER
 
-# 3. Start Kafka
+# 3. Start Kafka + Metabase
 docker-compose up -d
 
-# 4. Run pipeline
-python ingestion/fetch_energy.py
-python kafka/producer.py
-python kafka/consumer.py
-python silver/transform.py
-python snowflake/load_silver.py
+# 4. Run full pipeline (single command)
+python run_pipeline.py
 
-# 5. Run dbt
-cd energy_dbt
-dbt run
+# Or run manually step by step:
+# python ingestion/fetch_energy.py
+# python kafka/producer.py
+# python kafka/consumer.py
+# python silver/transform.py
+# python snowflake/load_silver.py
+# cd energy_dbt && dbt run && dbt test
+# cd .. && python great_expectations/validate_bronze.py
+# python great_expectations/validate_silver.py
+```
 
-# 6. Validate data quality
-cd ..
-python great_expectations/validate_bronze.py
-python great_expectations/validate_silver.py
+## Project Structure
 
-# Project Structure
+```
 eia-energy-pipeline/
 ├── ingestion/
-│   └── fetch_energy.py          # EIA API ingestion (3 series)
+│   └── fetch_energy.py          # EIA API ingestion (3 series, paginated)
 ├── kafka/
 │   ├── producer.py              # Publishes records to Kafka topic
 │   └── consumer.py              # Consumes and writes to Bronze Delta Lake
@@ -157,11 +164,14 @@ eia-energy-pipeline/
 ├── energy_dbt/
 │   └── models/
 │       ├── staging/             # Source definitions + staging view
-│       └── gold/                # 4 mart models
+│       └── gold/                # 4 mart models + schema tests
 ├── great_expectations/
 │   ├── validate_bronze.py       # 6 contracts on raw data
 │   └── validate_silver.py       # 5 contracts on cleaned data
-├── data/
-│   ├── bronze/                  # Delta Lake bronze layer
-│   └── silver/                  # Delta Lake silver layer
-└── docker-compose.yml           # Kafka + Metabase
+├── .github/
+│   └── workflows/
+│       └── validate.yml         # GitHub Actions CI -- dbt tests on every push
+├── run_pipeline.py              # Single command end-to-end pipeline execution
+├── docker-compose.yml           # Kafka + Metabase
+└── .env.example                 # Environment variable template
+```
