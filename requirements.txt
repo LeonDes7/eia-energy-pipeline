@@ -4,3 +4,10 @@ kafka-python
 deltalake
 pyarrow
 google-generativeai
+snowflake-connector-python
+cryptography
+dbt-core
+dbt-snowflake
+great_expectations
+groq
+pandas
