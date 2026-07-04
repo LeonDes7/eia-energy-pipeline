@@ -27,6 +27,6 @@ SELECT
     period,
     total_generation_mwh,
     renewable_generation_mwh,
-    ROUND(renewable_generation_mwh / NULLIF(total_generation_mwh, 0) * 100, 2) AS renewable_share_pct
+    COALESCE(ROUND(renewable_generation_mwh / NULLIF(total_generation_mwh, 0) * 100, 2), 0) AS renewable_share_pct
 FROM totals
 ORDER BY period DESC, renewable_share_pct DESC

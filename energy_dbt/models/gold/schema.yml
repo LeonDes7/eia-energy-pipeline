@@ -1,0 +1,47 @@
+version: 2
+
+models:
+  - name: renewable_share_by_state
+    columns:
+      - name: state_code
+        tests:
+          - not_null
+      - name: period
+        tests:
+          - not_null
+      - name: renewable_share_pct
+        tests:
+          - not_null
+
+  - name: price_volatility_index
+    columns:
+      - name: state_code
+        tests:
+          - not_null
+      - name: period
+        tests:
+          - not_null
+
+  - name: demand_vs_generation_gap
+    columns:
+      - name: state_code
+        tests:
+          - not_null
+      - name: period
+        tests:
+          - not_null
+      - name: total_generation_mwh
+        tests:
+          - not_null
+
+  - name: state_energy_mix_history
+    columns:
+      - name: state_code
+        tests:
+          - not_null
+      - name: fuel_type_code
+        tests:
+          - not_null
+      - name: is_current
+        tests:
+          - not_null

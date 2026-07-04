@@ -1,4 +1,3 @@
-# ingestion/fetch_energy.py
 import requests
 import json
 import os
@@ -10,107 +9,149 @@ load_dotenv()
 EIA_API_KEY = os.getenv("EIA_API_KEY")
 BASE_URL = "https://api.eia.gov/v2"
 
-def fetch_electricity_generation(start: str = "2020-01", end: str = "2024-12") -> list[dict]:
-    """Monthly electricity generation by state and fuel type (MWh)"""
+def fetch_electricity_generation(start: str = "2015-01", end: str = "2024-12") -> list[dict]:
     url = f"{BASE_URL}/electricity/electric-power-operational-data/data/"
-    params = {
-        "api_key": EIA_API_KEY,
-        "frequency": "monthly",
-        "data[0]": "generation",
-        "facets[fueltypeid][]": ["COL", "NG", "NUC", "SUN", "WND", "HYC"],
-        "start": start,
-        "end": end,
-        "sort[0][column]": "period",
-        "sort[0][direction]": "desc",
-        "offset": 0,
-        "length": 5000
-    }
-    resp = requests.get(url, params=params)
-    resp.raise_for_status()
-    raw = resp.json().get("response", {}).get("data", [])
     results = []
-    for row in raw:
-        results.append({
-            "source": "eia_electricity",
-            "series_id": f"elec_{row.get('location')}_{row.get('fueltypeid')}",
-            "period": row.get("period"),
-            "state": row.get("location"),
-            "fuel_type": row.get("fueltypeid"),
-            "metric": "generation_mwh",
-            "value": row.get("generation"),
-            "unit": "MWh",
-            "ingested_at": datetime.now(timezone.utc).isoformat()
-        })
-    print(f"Electricity generation: {len(results)} records fetched")
+    offset = 0
+
+    while True:
+        params = {
+            "api_key": EIA_API_KEY,
+            "frequency": "monthly",
+            "data[0]": "generation",
+            "facets[fueltypeid][]": ["COL", "NG", "NUC", "SUN", "WND", "HYC"],
+            "start": start,
+            "end": end,
+            "sort[0][column]": "period",
+            "sort[0][direction]": "desc",
+            "offset": offset,
+            "length": 5000
+        }
+        resp = requests.get(url, params=params)
+        resp.raise_for_status()
+        data = resp.json().get("response", {}).get("data", [])
+
+        if not data:
+            break
+
+        for row in data:
+            results.append({
+                "source": "eia_electricity",
+                "series_id": f"elec_{row.get('location')}_{row.get('fueltypeid')}",
+                "period": row.get("period"),
+                "state": row.get("location"),
+                "fuel_type": row.get("fueltypeid"),
+                "metric": "generation_mwh",
+                "value": row.get("generation"),
+                "unit": "MWh",
+                "ingested_at": datetime.now(timezone.utc).isoformat()
+            })
+
+        print(f"  Electricity offset {offset}: {len(data)} records")
+
+        if len(data) < 5000:
+            break
+
+        offset += 5000
+
+    print(f"Electricity generation total: {len(results)} records fetched")
     return results
 
 
-def fetch_natural_gas_prices(start: str = "2020-01", end: str = "2024-12") -> list[dict]:
-    """Monthly natural gas citygate prices by state ($/MCF)"""
+def fetch_natural_gas_prices(start: str = "2015-01", end: str = "2024-12") -> list[dict]:
     url = f"{BASE_URL}/natural-gas/pri/sum/data/"
-    params = {
-        "api_key": EIA_API_KEY,
-        "frequency": "monthly",
-        "data[0]": "value",
-        "start": start,
-        "end": end,
-        "sort[0][column]": "period",
-        "sort[0][direction]": "desc",
-        "offset": 0,
-        "length": 5000
-    }
-    resp = requests.get(url, params=params)
-    resp.raise_for_status()
-    raw = resp.json().get("response", {}).get("data", [])
     results = []
-    for row in raw:
-        results.append({
-            "source": "eia_natural_gas",
-            "series_id": f"ng_{row.get('duoarea')}_{row.get('process')}",
-            "period": row.get("period"),
-            "state": row.get("duoarea"),
-            "fuel_type": "NG",
-            "metric": "price_per_mcf",
-            "value": row.get("value"),
-            "unit": "$/MCF",
-            "ingested_at": datetime.now(timezone.utc).isoformat()
-        })
-    print(f"Natural gas prices: {len(results)} records fetched")
+    offset = 0
+
+    while True:
+        params = {
+            "api_key": EIA_API_KEY,
+            "frequency": "monthly",
+            "data[0]": "value",
+            "start": start,
+            "end": end,
+            "sort[0][column]": "period",
+            "sort[0][direction]": "desc",
+            "offset": offset,
+            "length": 5000
+        }
+        resp = requests.get(url, params=params)
+        resp.raise_for_status()
+        data = resp.json().get("response", {}).get("data", [])
+
+        if not data:
+            break
+
+        for row in data:
+            results.append({
+                "source": "eia_natural_gas",
+                "series_id": f"ng_{row.get('duoarea')}_{row.get('process')}",
+                "period": row.get("period"),
+                "state": row.get("duoarea"),
+                "fuel_type": "NG",
+                "metric": "price_per_mcf",
+                "value": row.get("value"),
+                "unit": "$/MCF",
+                "ingested_at": datetime.now(timezone.utc).isoformat()
+            })
+
+        print(f"  Natural gas offset {offset}: {len(data)} records")
+
+        if len(data) < 5000:
+            break
+
+        offset += 5000
+
+    print(f"Natural gas prices total: {len(results)} records fetched")
     return results
 
 
-def fetch_renewable_generation(start: str = "2020-01", end: str = "2024-12") -> list[dict]:
-    """Monthly renewable energy generation by state (MWh)"""
+def fetch_renewable_generation(start: str = "2015-01", end: str = "2024-12") -> list[dict]:
     url = f"{BASE_URL}/electricity/electric-power-operational-data/data/"
-    params = {
-        "api_key": EIA_API_KEY,
-        "frequency": "monthly",
-        "data[0]": "generation",
-        "facets[fueltypeid][]": ["SUN", "WND", "HYC"],
-        "start": start,
-        "end": end,
-        "sort[0][column]": "period",
-        "sort[0][direction]": "desc",
-        "offset": 0,
-        "length": 5000
-    }
-    resp = requests.get(url, params=params)
-    resp.raise_for_status()
-    raw = resp.json().get("response", {}).get("data", [])
     results = []
-    for row in raw:
-        results.append({
-            "source": "eia_renewable",
-            "series_id": f"renew_{row.get('location')}_{row.get('fueltypeid')}",
-            "period": row.get("period"),
-            "state": row.get("location"),
-            "fuel_type": row.get("fueltypeid"),
-            "metric": "generation_mwh",
-            "value": row.get("generation"),
-            "unit": "MWh",
-            "ingested_at": datetime.now(timezone.utc).isoformat()
-        })
-    print(f"Renewable generation: {len(results)} records fetched")
+    offset = 0
+
+    while True:
+        params = {
+            "api_key": EIA_API_KEY,
+            "frequency": "monthly",
+            "data[0]": "generation",
+            "facets[fueltypeid][]": ["SUN", "WND", "HYC"],
+            "start": start,
+            "end": end,
+            "sort[0][column]": "period",
+            "sort[0][direction]": "desc",
+            "offset": offset,
+            "length": 5000
+        }
+        resp = requests.get(url, params=params)
+        resp.raise_for_status()
+        data = resp.json().get("response", {}).get("data", [])
+
+        if not data:
+            break
+
+        for row in data:
+            results.append({
+                "source": "eia_renewable",
+                "series_id": f"renew_{row.get('location')}_{row.get('fueltypeid')}",
+                "period": row.get("period"),
+                "state": row.get("location"),
+                "fuel_type": row.get("fueltypeid"),
+                "metric": "generation_mwh",
+                "value": row.get("generation"),
+                "unit": "MWh",
+                "ingested_at": datetime.now(timezone.utc).isoformat()
+            })
+
+        print(f"  Renewable offset {offset}: {len(data)} records")
+
+        if len(data) < 5000:
+            break
+
+        offset += 5000
+
+    print(f"Renewable generation total: {len(results)} records fetched")
     return results
 
 
