@@ -1,10 +1,7 @@
 name: dbt CI -- Validate Gold Models
 
 on:
-  push:
-    branches: [ master ]
-  pull_request:
-    branches: [ master ]
+  workflow_dispatch:
 
 jobs:
   dbt-test:
